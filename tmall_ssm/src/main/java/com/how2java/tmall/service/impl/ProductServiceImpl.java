@@ -4,11 +4,12 @@ import com.how2java.tmall.mapper.ProductMapper;
 import com.how2java.tmall.pojo.Category;
 import com.how2java.tmall.pojo.Product;
 import com.how2java.tmall.pojo.ProductExample;
-import com.how2java.tmall.service.CategoryService;
-import com.how2java.tmall.service.ProductService;
+import com.how2java.tmall.pojo.ProductImage;
+import com.how2java.tmall.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -17,6 +18,12 @@ public class ProductServiceImpl implements ProductService {
     ProductMapper productMapper;
     @Autowired
     CategoryService categoryService;
+    @Autowired
+    ProductImageService productImageService;
+    @Autowired
+    OrderItemService orderItemService;
+    @Autowired
+    ReviewService reviewService;
 
     @Override
     public void add(Product p) {
@@ -33,23 +40,23 @@ public class ProductServiceImpl implements ProductService {
         productMapper.updateByPrimaryKeySelective(p);
     }
 
-    public void setCategory(Product p) {
-        int cid = p.getCid();
-        Category c = categoryService.get(cid);
-        p.setCategory(c);
-    }
-
     @Override
     public Product get(int id) {
         Product p = productMapper.selectByPrimaryKey(id);
+        setFirstProductImage(p);
         setCategory(p);
         return p;
     }
 
     public void setCategory(List<Product> ps) {
-        for (Product p : ps) {
+        for (Product p : ps)
             setCategory(p);
-        }
+    }
+
+    public void setCategory(Product p) {
+        int cid = p.getCid();
+        Category c = categoryService.get(cid);
+        p.setCategory(c);
     }
 
     @Override
@@ -59,8 +66,80 @@ public class ProductServiceImpl implements ProductService {
         example.setOrderByClause("id asc");
         List result = productMapper.selectByExample(example);
         setCategory(result);
+        setFirstProductImage(result);
         return result;
     }
 
+    @Override
+    public void setFirstProductImage(Product p) {
+        List<ProductImage> pis = productImageService.list(p.getId(), ProductImageService.type_single);
+        if (!pis.isEmpty()) {
+            ProductImage pi = pis.get(0);
+            p.setFirstProductImage(pi);
+        }
+    }
+
+    @Override
+    public void fill(List<Category> cs) {
+        for (Category c : cs) {
+            fill(c);
+        }
+    }
+
+    @Override
+    public void fill(Category c) {
+        List<Product> ps = list(c.getId());
+        c.setProducts(ps);
+    }
+
+    @Override
+    public void fillByRow(List<Category> cs) {
+        int ProductNumberEachRow = 8;
+        for (Category c : cs) {
+            List<Product> products = c.getProducts();
+            List<List<Product>> productByRow = new ArrayList<>();
+            for (int i = 0; i < products.size(); i += ProductNumberEachRow) {
+                int size = i + ProductNumberEachRow;
+                size = size > products.size() ? products.size() : size;
+                List<Product> productOfEachRow = products.subList(i, size);
+                productByRow.add(productOfEachRow);
+
+            }
+            c.setProductsByRow(productByRow);
+        }
+    }
+
+    @Override
+    public void setSaleAndReviewNumber(Product p) {
+        int saleCount = orderItemService.getSaleCount(p.getId());
+        p.setSaleCount(saleCount);
+
+        int reviewCount = reviewService.getCount(p.getId());
+        p.setReviewCount(reviewCount);
+    }
+
+    @Override
+    public void setSaleAndReviewNumber(List<Product> ps) {
+        for (Product p : ps) {
+            setSaleAndReviewNumber(p);
+        }
+    }
+
+    @Override
+    public List<Product> search(String keyword) {
+        ProductExample example = new ProductExample();
+        example.createCriteria().andNameLike("%" + keyword + "%");
+        example.setOrderByClause("id asc");
+        List result = productMapper.selectByExample(example);
+        setFirstProductImage(result);
+        setCategory(result);
+        return result;
+    }
+
+    public void setFirstProductImage(List<Product> ps) {
+        for (Product p : ps) {
+            setFirstProductImage(p);
+        }
+    }
 
 }

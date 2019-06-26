@@ -6,6 +6,7 @@ public class Property {
     private Integer cid;
 
     private String name;
+
     private Category category;
 
     public Integer getId() {
